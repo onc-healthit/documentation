@@ -1,0 +1,249 @@
+Create the VM in AWS
+
+Login with SSH and key to the server (username = ubuntu)
+
+Create the users that will admin the servers
+	sudo adduser ccimaszewski
+	sudo adduser dbrown
+	sudo adduser nbashyam
+	sudo adduser bmarquard
+
+Add the users to the admin group (will allow sudo)
+	sudo usermod -a -G admin ccimaszewski
+	sudo usermod -a -G admin dbrown
+	sudo usermod -a -G admin nbashyam
+	sudo usermod -a -G admin bmarquard
+
+sudo su as user
+cd ~
+mkdir .ssh
+cd .ssh
+ssh-keygen
+touch authorized_keys
+cat dbrown.pub >> authorized_keys
+
+sudo adduser svalluripalli
+sudo usermod -a -G admin svalluripalli
+touch svalluripalli/authorized_keys
+cat svalluripalli/svalluripalli.pub >> svalluripalli/authorized_keys
+sudo mv svalluripalli /home/svalluripalli/.ssh
+sudo chown -R svalluripalli:svalluripalli /home/svalluripalli/.ssh
+
+Exit the ssh session and log in with username
+
+
+Create swap file (8GB - This will take a while):
+
+sudo dd if=/dev/zero of=/var/swapfile bs=1M count=8192 &&
+sudo chmod 600 /var/swapfile &&
+sudo mkswap /var/swapfile &&
+echo /var/swapfile none swap defaults 0 0 | sudo tee -a /etc/fstab &&
+sudo swapon -a
+
+
+Liferay server:
+
+
+Install JVM ------
+
+Download jdk6 (latest version from Oracle)
+
+chmod +x jdk-6u45-linux-x64.bin
+
+Extract
+
+./jdk-6u45-linux-x64
+
+Make the new directory
+
+sudo mkdir /usr/lib/jvm
+
+Move the extracted folder into the newly created jvm folder
+
+sudo mv jdk1.6.0_32 /usr/lib/jvm/java-6-oracle-x64
+
+Install oracle java as an alternative
+
+sudo update-alternatives --install /usr/bin/javac javac /usr/lib/jvm/java-6-oracle-x64/bin/javac 1 
+sudo update-alternatives --install /usr/bin/java java /usr/lib/jvm/java-6-oracle-x64/bin/java 1 
+sudo update-alternatives --install /usr/bin/javaws javaws /usr/lib/jvm/java-6-oracle-x64/bin/javaws 1
+
+To make this make the oracle java the default
+
+sudo update-alternatives --config javac 
+sudo update-alternatives --config java 
+sudo update-alternatives --config javaws
+
+
+To verify Java has installed correctly use this command
+
+java -version
+
+Install tomcat7---
+
+DO NOT DO INSTALL from apt, tomcat from apt is an older version and there's a bug in the configuration
+
+Download Tomcat:
+
+wget http://mirror.sdunix.com/apache/tomcat/tomcat-7/v7.0.42/bin/apache-tomcat-7.0.42.tar.gz
+
+Decompress and unarchive
+
+tar zxvf apache-tomcat-7.0.42.tar.gz
+
+move to final directory
+
+sudo mv apache-tomcat-7.0.42.tar.gz /opt/tomcat7
+
+create /opt/tomcat7/bin/setenv.sh
+
+####################################################
+#!/bin/bash
+
+JAVA_HOME = /usr/lib/java-6-oracle-x64
+
+####################################################
+
+
+Start up tomcat as a test
+
+sudo /opt/tomcat7/bin/catalina.sh start
+
+
+Configure apache proxy
+
+cd /etc/apache2/sites-available
+
+sudo cp default dev-sitenv-org
+
+edit the file..
+
+cd ../sites-enabled
+sudo ln -s ../sites-available/dev-sitenv-org 000-dev-sitenv-org
+sudo rm 000-default
+sudo service apache2 restart
+
+cd ../mods-enabled
+
+ sudo ln -s ../mods-available/proxy.conf proxy.conf
+ sudo ln -s ../mods-available/proxy.load proxy.load
+ sudo ln -s ../mods-available/proxy_ajp.load proxy_ajp.load
+ sudo ln -s ../mods-available/proxy_http.load proxy_http.load
+
+-----------------------------------------install postgresql
+
+sudo apt-get install postgresql
+
+sudo -u postgres psql postrgres  <--- this will bring us to a postgres prompt
+
+\password  <-- changed default password to Audac1ous   CTRL+D exits the prompt
+
+update postgresql.conf in /etc/postgresql/9.1/main/
+
+enable port listening on 5432, Uncomment the following line:
+listen_addresses = 'localhost'
+
+now we should be able to tunnel to postgres through ssh and also connect to it via liferay...
+
+connect to postgres with pgAdmin3
+
+create user with pgAdmin3  username : LifeRaySys     password : Audac1ous
+
+upload backup of lportal database to server using winscp (called lportal.dump)
+
+import the backup
+sudo -u postgres psql -d postgres -U postgres -f ~/lportal.dump
+
+
+
+download the following files from liferay:
+liferay-portal-6.1.1-ce-ga2-20120731132656558.war
+liferay-portal-dependencies-6.1.1-ce-ga2-20120731132656558.zip
+liferay-portal-src-6.1.1-ce-ga2-20120731132656558.zip
+postgresql-9.2-1003.jdbc4.jar
+jta-1.1.jar
+
+Unzip the portal src archive
+
+Everything from the portal dependencies package goes into $TOMCAT_HOME/lib/ext (mkdir if needed)
+portal_Src/lib/development we want the following jars copied into $TOMCAT_HOME/lib/ext
+•	activation.jar
+•	jms.jar
+•	jta.jar
+•	jutf7.jar
+•	mail.jar
+•	persistence.jar
+From PORTAL_SRC/lib/portal, we want to copy ccpp.jar to the $TOMCAT_HOME/lib/ext directory
+
+
+FROM portal_SRc/lib/development, we copy the following jars to $TOMCAT_HOME/temp/liferay/com/liferay/portal/deploy/dependencies/
+resin.jar
+script-10.jar
+
+unzip the liferay dependencies jar to the lib/ext directory in tomcat
+
+
+
+copy the postgresql driver jar and jta jar to TOMCAT_HOME/lib/ext
+
+update setenv.sh
+
+JAVA_OPTS="$JAVA_OPTS -Dfile.encoding=UTF8 -Djava.net.preferIPv4Stack=true -Dorg.apache.catalina.loader.WebappClassLoader.ENABLE_CLEAR_REFERENCES=false -Duser.timezone=GMT -Xmx1024m -XX:MaxPermSize=256m"
+
+
+
+Create ROOT.xml
+
+copy current data directory from prod
+
+copy postgres database from prod
+
+
+Postgres autostart needs to be fixed
+ sudo update-rc.d -f postgresql remove
+ sudo update-rc.d -f postgresql defaults
+
+
+Update catalina.properties
+
+update server.xml to include UTF-8
+
+update portal-ext.properties file
+
+copy portal-setup-wizard.properties
+
+-----  edit /etc/init.d/tomcat7
+
+#!/bin/bash
+
+### BEGIN INIT INFO
+# Provides:        tomcat7
+# Required-Start:  $network
+# Required-Stop:   $network
+# Default-Start:   2 3 4 5
+# Default-Stop:    0 1 6
+# Short-Description: Start/Stop Tomcat server
+### END INIT INFO
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin:/opt/tomcat7/bin
+
+start() {
+ sh /opt/tomcat7/bin/catalina.sh start
+}
+
+stop() {
+ sh /opt/tomcat7/bin/catalina.sh stop
+}
+
+case $1 in
+  start|stop) $1;;
+  restart) stop; start;;
+  *) echo "Run as $0 <start|stop|restart>"; exit 1;;
+esac
+
+------
+
+sudo chmod 755 /etc/init.d/tomcat7
+sudo update-rc.d tomcat7 defaults
+
+now tomcat can be started with the command 'sudo service tomcat7 start' and stopped with 'sudo service tomcat7 stop'
