@@ -22,14 +22,14 @@ ssh-keygen
 touch authorized_keys
 cat dbrown.pub >> authorized_keys
 
-sudo adduser cwatson
-sudo usermod -a -G admin cwatson
-mkdir cwatson
-mv cwatson.pub cwatson/
-touch cwatson/authorized_keys
-cat cwatson/cwatson.pub >> cwatson/authorized_keys
-sudo mv cwatson /home/cwatson/.ssh
-sudo chown -R cwatson:cwatson /home/cwatson/.ssh
+sudo adduser mnarne
+sudo usermod -a -G admin mnarne
+mkdir mnarne
+mv mnarne.pub mnarne/
+touch mnarne/authorized_keys
+cat mnarne/mnarne.pub >> mnarne/authorized_keys
+sudo mv mnarne /home/mnarne/.ssh
+sudo chown -R mnarne:mnarne /home/mnarne/.ssh
 
 Exit the ssh session and log in with username
 
